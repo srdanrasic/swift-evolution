@@ -3,11 +3,12 @@
 * Proposal: [SE-NNNN](NNNN-filename.md)
 * Authors: [Author 1](https://github.com/swiftdev), [Author 2](https://github.com/swiftdev)
 * Review Manager: TBD
-* Status: **Awaiting review**
+* Status: **Awaiting implementation**
 
 *During the review process, add the following fields as needed:*
 
-* Decision Notes: [Rationale](https://lists.swift.org/pipermail/swift-evolution/), [Additional Commentary](https://lists.swift.org/pipermail/swift-evolution/)
+* Implementation: [apple/swift#NNNNN](https://github.com/apple/swift/pull/NNNNN)
+* Decision Notes: [Rationale](https://forums.swift.org/), [Additional Commentary](https://forums.swift.org/)
 * Bugs: [SR-NNNN](https://bugs.swift.org/browse/SR-NNNN), [SR-MMMM](https://bugs.swift.org/browse/SR-MMMM)
 * Previous Revision: [1](https://github.com/apple/swift-evolution/blob/...commit-ID.../proposals/NNNN-filename.md)
 * Previous Proposal: [SE-XXXX](XXXX-filename.md)
@@ -18,7 +19,7 @@ A short description of what the feature is. Try to keep it to a
 single-paragraph "elevator pitch" so the reader understands what
 problem this proposal is addressing.
 
-Swift-evolution thread: [Discussion thread topic for that proposal](https://lists.swift.org/pipermail/swift-evolution/)
+Swift-evolution thread: [Discussion thread topic for that proposal](https://forums.swift.org/)
 
 ## Motivation
 

@@ -2,13 +2,15 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 // ===---------------------------------------------------------------------===//
+
+'use strict'
 
 /** Holds the primary data used on this page: metadata about Swift Evolution proposals. */
 var proposals
@@ -17,12 +19,13 @@ var proposals
  * To be updated when proposals are confirmed to have been implemented
  * in a new language version.
  */
-var languageVersions = ['2.2', '3', '3.0.1', '3.1', '4']
+var languageVersions = ['2.2', '3', '3.0.1', '3.1', '4', '4.1', '4.2', '5', '5.1']
 
 /** Storage for the user's current selection of filters when filtering is toggled off. */
 var filterSelection = []
 
-var REPO_PROPOSALS_BASE_URL = 'https://github.com/apple/swift-evolution/blob/master/proposals'
+var GITHUB_BASE_URL = 'https://github.com/'
+var REPO_PROPOSALS_BASE_URL = GITHUB_BASE_URL + 'apple/swift-evolution/blob/master/proposals'
 
 /**
  * `name`: Mapping of the states in the proposals JSON to human-readable names.
@@ -119,12 +122,16 @@ function init () {
     if (document.querySelector('#search-filter').value.trim()) {
       filterProposals()
     }
+
+    // apply selections from the current page's URI fragment
+    _applyFragment(document.location.hash)
   })
 
   req.addEventListener('error', function (e) {
-    document.querySelector('#proposals-count').innerText = 'Proposal data failed to load.'
+    document.querySelector('#proposals-count-number').innerText = 'Proposal data failed to load.'
   })
 
+  document.querySelector('#proposals-count-number').innerHTML = 'Loading ...'
   req.open('get', 'https://data.swift.org/swift-evolution/proposals')
   req.send()
 }
@@ -186,13 +193,13 @@ function renderNav () {
   // .acceptedWithRevisions proposals are combined in the filtering UI
   // with .accepted proposals.
   var checkboxes = [
-    '.awaitingReview', '.scheduledForReview', '.activeReview', '.returnedForRevision', '.accepted',
-    '.implemented', '.deferred', '.rejected', '.withdrawn'
+    '.awaitingReview', '.scheduledForReview', '.activeReview', '.accepted',
+    '.implemented', '.returnedForRevision', '.deferred', '.rejected', '.withdrawn'
   ].map(function (state) {
     var className = states[state].className
 
     return html('li', null, [
-      html('input', { type: 'checkbox', id: 'filter-by-' + className, value: className }),
+      html('input', { type: 'checkbox', className: 'filtered-by-status', id: 'filter-by-' + className, value: className }),
       html('label', { className: className, tabindex: '0', role: 'button', 'for': 'filter-by-' + className }, [
         states[state].name
       ])
@@ -200,8 +207,8 @@ function renderNav () {
   })
 
   var expandableArea = html('div', { className: 'filter-options expandable' }, [
-    html('h5', { id: 'filter-options-label'}, 'Status'),
-    html('ul', { className: 'filter-by-status'})
+    html('h5', { id: 'filter-options-label' }, 'Status'),
+    html('ul', { className: 'filter-by-status' })
   ])
 
   nav.querySelector('.nav-contents').appendChild(expandableArea)
@@ -218,25 +225,20 @@ function renderNav () {
   if (implementedCheckboxIfPresent) {
     // add an extra row of options to filter by language version
     var versionRowHeader = html('h5', { id: 'version-options-label', className: 'hidden' }, 'Language Version')
-    var versionRow = html('ul', { id: 'version-options', className: 'filter-by-status hidden'})
-
-    /** Helper to give versions like 3.0.1 an okay ID to use in a DOM element. (swift-3-0-1) */
-    function idSafeName (name) {
-      return 'swift-' + name.replace(/\./g, '-')
-    }
+    var versionRow = html('ul', { id: 'version-options', className: 'filter-by-status hidden' })
 
     var versionOptions = languageVersions.map(function (version) {
       return html('li', null, [
         html('input', {
           type: 'checkbox',
-          id: 'filter-by-swift-' + idSafeName(version),
+          id: 'filter-by-swift-' + _idSafeName(version),
           className: 'filter-by-swift-version',
-          value: 'swift-' + idSafeName(version)
+          value: 'swift-' + _idSafeName(version)
         }),
         html('label', {
           tabindex: '0',
           role: 'button',
-          'for': 'filter-by-swift-' + idSafeName(version)
+          'for': 'filter-by-swift-' + _idSafeName(version)
         }, 'Swift ' + version)
       ])
     })
@@ -259,10 +261,10 @@ function renderBody () {
   var proposalAttachPoint = article.querySelector('.proposals-list')
 
   var proposalPresentationOrder = [
-    '.awaitingReview', '.scheduledForReview', '.activeReview', '.returnedForRevision', '.accepted',
-    '.acceptedWithRevisions', '.implemented', '.deferred', '.rejected', '.withdrawn'
+    '.awaitingReview', '.scheduledForReview', '.activeReview', '.accepted',
+    '.acceptedWithRevisions', '.implemented', '.returnedForRevision', '.deferred', '.rejected', '.withdrawn'
   ]
-
+    
   proposalPresentationOrder.map(function (state) {
     var matchingProposals = proposals.filter(function (p) { return p.status && p.status.state === state })
     matchingProposals.map(function (proposal) {
@@ -274,7 +276,7 @@ function renderBody () {
         ]),
         html('div', { className: 'proposal-content' }, [
           html('div', { className: 'proposal-header' }, [
-            html('span', { className: 'proposal-id'}, [
+            html('span', { className: 'proposal-id' }, [
               proposal.id
             ]),
             html('h4', { className: 'proposal-title' }, [
@@ -295,12 +297,16 @@ function renderBody () {
       if (proposal.reviewManager.name) detailNodes.push(renderReviewManager(proposal.reviewManager))
       if (proposal.trackingBugs) detailNodes.push(renderTrackingBugs(proposal.trackingBugs))
       if (state === '.implemented') detailNodes.push(renderVersion(proposal.status.version))
-
+      if (proposal.implementation) detailNodes.push(renderImplementation(proposal.implementation))
       if (state === '.acceptedWithRevisions') detailNodes.push(renderStatus(proposal.status))
 
       if (state === '.activeReview' || state === '.scheduledForReview') {
         detailNodes.push(renderStatus(proposal.status))
         detailNodes.push(renderReviewPeriod(proposal.status))
+      }
+
+      if (state === '.returnedForRevision') {
+        detailNodes.push(renderStatus(proposal.status))
       }
 
       var details = html('div', { className: 'proposal-details' }, detailNodes)
@@ -340,7 +346,7 @@ function renderAuthors (authors) {
 function renderReviewManager (reviewManager) {
   return html('div', { className: 'review-manager proposal-detail' }, [
     html('div', { className: 'proposal-detail-label' }, 'Review Manager: '),
-    html('div', { className: 'proposal-detail-value'}, [
+    html('div', { className: 'proposal-detail-value' }, [
       reviewManager.link
         ? html('a', { href: reviewManager.link, target: '_blank' }, reviewManager.name)
         : reviewManager.name
@@ -369,6 +375,30 @@ function renderTrackingBugs (bugs) {
     ]),
     html('div', { className: 'bug-list proposal-detail-value' },
       bugNodes
+    )
+  ])
+}
+
+/** Implementations are required alongside proposals (after Swift 4.0). */
+function renderImplementation (implementations) {
+  var implNodes = implementations.map(function (impl) {
+    return html('a', {
+      href: GITHUB_BASE_URL + impl.account + '/' + impl.repository + '/' + impl.type + '/' + impl.id
+    }, [
+      impl.repository,
+      impl.type === 'pull' ? '#' : '@',
+      impl.id.substr(0, 7)
+    ])
+  })
+
+  implNodes = _joinNodes(implNodes, ', ')
+
+  var label = 'Implementation: '
+
+  return html('div', { className: 'proposal-detail' }, [
+    html('div', { className: 'proposal-detail-label' }, [label]),
+    html('div', { className: 'implementation-list proposal-detail-value' },
+      implNodes
     )
   ])
 }
@@ -408,19 +438,32 @@ function renderReviewPeriod (status) {
   var start = new Date(status.start)
   var end = new Date(status.end)
 
+  var startMonth = start.getUTCMonth()
+  var endMonth = end.getUTCMonth()
+
+  var detailNodes = [months[startMonth], ' ']
+
+  if (startMonth === endMonth) {
+    detailNodes.push(
+      start.getUTCDate().toString(),
+      '–',
+      end.getUTCDate().toString()
+    )
+  } else {
+    detailNodes.push(
+      start.getUTCDate().toString(),
+      ' – ',
+      months[endMonth],
+      ' ',
+      end.getUTCDate().toString()
+    )
+  }
+
   return html('div', { className: 'proposal-detail' }, [
     html('div', { className: 'proposal-detail-label' }, [
       'Scheduled: '
     ]),
-    html('div', { className: 'proposal-detail-value' }, [
-      months[start.getUTCMonth()],
-      ' ',
-      start.getUTCDate().toString(),
-      ' — ',
-      months[end.getUTCMonth()],
-      ' ',
-      end.getUTCDate().toString()
-    ])
+    html('div', { className: 'proposal-detail-value' }, detailNodes)
   ])
 }
 
@@ -438,7 +481,7 @@ function _joinNodes (nodeList, text) {
 function addEventListeners () {
   var nav = document.querySelector('nav')
 
-  // typing in the search field causes the filter to be reapplied.
+  // typing in the search field causes the filter to be reapplied.  
   nav.addEventListener('keyup', filterProposals)
   nav.addEventListener('change', filterProposals)
 
@@ -577,13 +620,22 @@ function filterProposals () {
     clearButton.classList.remove('hidden')
   }
 
-  // The search input treats words as order-independent.
-  var matchingSets = filter.split(/\s/)
-    .filter(function (s) { return s.length > 0 })
-    .map(function (part) { return _searchProposals(part) })
+  var matchingSets = [proposals.concat()]
 
-  if (filter.trim().length === 0) {
-    matchingSets = [proposals.concat()]
+  // Comma-separated lists of proposal IDs are treated as an "or" search.
+  if (filter.match(/(SE-\d\d\d\d)($|((,SE-\d\d\d\d)+))/i)) {
+    var proposalIDs = filter.split(',').map(function (id) {
+      return id.toUpperCase()
+    })
+
+    matchingSets[0] = matchingSets[0].filter(function (proposal) {
+      return proposalIDs.indexOf(proposal.id) !== -1
+    })
+  } else if (filter.trim().length !== 0) {
+    // The search input treats words as order-independent.
+    matchingSets = filter.split(/\s/)
+      .filter(function (s) { return s.length > 0 })
+      .map(function (part) { return _searchProposals(part) })
   }
 
   var intersection = matchingSets.reduce(function (intersection, candidates) {
@@ -591,6 +643,7 @@ function filterProposals () {
   }, matchingSets[0] || [])
 
   _applyFilter(intersection)
+  _updateURIFragment()
 }
 
 /**
@@ -613,6 +666,9 @@ function _searchProposals (filterText) {
       ['status', 'version'],
       ['authors', 'name'],
       ['authors', 'link'],
+      ['implementation', 'account'],
+      ['implementation', 'repository'],
+      ['implementation', 'id'],
       ['trackingBugs', 'link'],
       ['trackingBugs', 'status'],
       ['trackingBugs', 'id'],
@@ -711,6 +767,189 @@ function _applyFilter (matchingProposals) {
 }
 
 /**
+ * Parses a URI fragment and applies a search and filters to the page.
+ *
+ * Syntax (a query string within a fragment):
+ *   fragment --> `#?` parameter-value-list
+ *   parameter-value-list --> parameter-value | parameter-value-pair `&` parameter-value-list
+ *   parameter-value-pair --> parameter `=` value
+ *   parameter --> `proposal` | `status` | `version` | `search`
+ *   value --> ** Any URL-encoded text. **
+ *
+ * For example:
+ *   /#?proposal:SE-0180,SE-0123
+ *   /#?status=rejected&version=3&search=access
+ *
+ * Four types of parameters are supported:
+ * - proposal: A comma-separated list of proposal IDs. Treated as an 'or' search.
+ * - filter: A comma-separated list of proposal statuses to apply as a filter.
+ * - version: A comma-separated list of Swift version numbers to apply as a filter.
+ * - search: Raw, URL-encoded text used to filter by individual term.
+ *
+ * @param {string} fragment - A URI fragment to use as the basis for a search.
+ */
+function _applyFragment (fragment) {
+  if (!fragment || fragment.substr(0, 2) !== '#?') return
+  fragment = fragment.substring(2) // remove the #?
+
+  // use this literal's keys as the source of truth for key-value pairs in the fragment
+  var actions = { proposal: [], search: null, status: [], version: [] }
+
+  // parse the fragment as a query string
+  Object.keys(actions).forEach(function (action) {
+    var pattern = new RegExp(action + '=([^=]+)(&|$)')
+    var values = fragment.match(pattern)
+
+    if (values) {
+      var value = values[1] // 1st capture group from the RegExp
+      if (action === 'search') {
+        value = decodeURIComponent(value)
+      } else {
+        value = value.split(',')
+      }
+
+      actions[action] = value
+    }
+  })
+
+  // perform key-specific parsing and checks
+
+  if (actions.proposal.length) {
+    document.querySelector('#search-filter').value = actions.proposal.join(',')
+  } else if (actions.search) {
+    document.querySelector('#search-filter').value = actions.search
+  }
+
+  if (actions.version.length) {
+    var versionSelections = actions.version.map(function (version) {
+      return document.querySelector('#filter-by-swift-' + _idSafeName(version))
+    }).filter(function (version) {
+      return !!version
+    })
+
+    versionSelections.forEach(function (versionSelection) {
+      versionSelection.checked = true
+    })
+
+    if (versionSelections.length) {
+      document.querySelector(
+        '#filter-by-' + states['.implemented'].className
+      ).checked = true
+    }
+  }
+
+  // track this state specifically for toggling the version panel
+  var implementedSelected = false
+
+  // update the filter selections in the nav
+  if (actions.status.length) {
+    var statusSelections = actions.status.map(function (status) {
+      var stateName = Object.keys(states).filter(function (state) {
+        return states[state].className === status
+      })[0]
+
+      if (!stateName) return // fragment contains a nonexistent state
+      var state = states[stateName]
+
+      if (stateName === '.implemented') implementedSelected = true
+
+      return document.querySelector('#filter-by-' + state.className)
+    }).filter(function (status) {
+      return !!status
+    })
+
+    statusSelections.forEach(function (statusSelection) {
+      statusSelection.checked = true
+    })
+  }
+
+  // the version panel needs to be activated if any are specified
+  if (actions.version.length || implementedSelected) {
+    ;['#version-options', '#version-options-label'].forEach(function (selector) {
+      document.querySelector('.filter-options')
+        .querySelector(selector).classList
+        .toggle('hidden')
+    })
+  }
+
+  // specifying any filter in the fragment should activate the filters in the UI
+  if (actions.version.length || actions.status.length) {
+    toggleFilterPanel()
+    toggleFiltering()
+  }
+
+  filterProposals()
+}
+
+/**
+ * Writes out the current search and filter settings to document.location
+ * via window.replaceState.
+ */
+function _updateURIFragment () {
+  var actions = { proposal: [], search: null, status: [], version: [] }
+
+  var search = document.querySelector('#search-filter')
+
+  if (search.value && search.value.match(/(SE-\d\d\d\d)($|((,SE-\d\d\d\d)+))/i)) {
+    actions.proposal = search.value.toUpperCase().split(',')
+  } else {
+    actions.search = search.value
+  }
+
+  var selectedVersions = document.querySelectorAll('.filter-by-swift-version:checked')
+  var versions = [].map.call(selectedVersions, function (checkbox) {
+    return checkbox.value.split('swift-swift-')[1].split('-').join('.')
+  })
+
+  actions.version = versions
+
+  var selectedStatuses = document.querySelectorAll('.filtered-by-status:checked')
+  var statuses = [].map.call(selectedStatuses, function (checkbox) {
+    var className = checkbox.value
+
+    var correspondingStatus = Object.keys(states).filter(function (status) {
+      if (states[status].className === className) return true
+      return false
+    })[0]
+
+    return states[correspondingStatus].className
+  })
+
+  // .implemented is redundant if any specific implementation versions are selected.
+  if (actions.version.length) {
+    statuses = statuses.filter(function (status) {
+      return status !== states['.implemented'].className
+    })
+  }
+
+  actions.status = statuses
+
+  // build the actual fragment string.
+  var fragments = []
+  if (actions.proposal.length) fragments.push('proposal=' + actions.proposal.join(','))
+  if (actions.status.length) fragments.push('status=' + actions.status.join(','))
+  if (actions.version.length) fragments.push('version=' + actions.version.join(','))
+
+  // encoding the search lets you search for `??` and other edge cases.
+  if (actions.search) fragments.push('search=' + encodeURIComponent(actions.search))
+
+  if (!fragments.length) {
+    window.history.replaceState(null, null, './')
+    return
+  }
+
+  var fragment = '#?' + fragments.join('&')
+
+  // avoid creating new history entries each time a search or filter updates
+  window.history.replaceState(null, null, fragment)
+}
+
+/** Helper to give versions like 3.0.1 an okay ID to use in a DOM element. (swift-3-0-1) */
+function _idSafeName (name) {
+  return 'swift-' + name.replace(/\./g, '-')
+}
+
+/**
  * Changes the text after 'Filtered by: ' to reflect the current status filters.
  *
  * After FILTER_DESCRIPTION_LIMIT filters are explicitly named, start combining the descriptive text
@@ -735,11 +974,11 @@ function updateFilterDescription (selectedStateNames) {
 
   if (swiftVersionStates.length > 0 && swiftVersionStates.length <= FILTER_DESCRIPTION_LIMIT) {
     selectedStateNames = selectedStateNames.filter(function (state) { return !state.match(/swift|implemented/i) })
-      .concat(`Implemented (${swiftVersionStates.join(', ')})`)
+      .concat('Implemented (' + swiftVersionStates.join(', ') + ')')
   }
 
   if (selectedStateNames.length > FILTER_DESCRIPTION_LIMIT) {
-    container.innerText = `${stateCount} Filters`
+    container.innerText = stateCount + ' Filters'
   } else if (selectedStateNames.length === 0) {
     container.innerText = 'All Statuses'
   } else {
