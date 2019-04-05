@@ -1,11 +1,11 @@
 # Tuple comparison operators
 
 * Proposal: [SE-0015](0015-tuple-comparison-operators.md)
-* Author: [Kevin Ballard](https://github.com/kballard)
+* Author: [Lily Ballard](https://github.com/lilyball)
 * Review Manager: [Dave Abrahams](https://github.com/dabrahams)
 * Status: **Implemented (Swift 2.2)**
 * Decision Notes: [Rationale](https://lists.swift.org/pipermail/swift-evolution/Week-of-Mon-20151221/004423.html)
-* Pull Request: [apple/swift#408](https://github.com/apple/swift/pull/408)
+* Implementation: [apple/swift#408](https://github.com/apple/swift/pull/408)
 
 ## Introduction
 

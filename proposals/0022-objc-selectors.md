@@ -5,7 +5,7 @@
 * Review Manager: [Joe Groff](https://github.com/jckarter)
 * Status: **Implemented (Swift 2.2)**
 * Decision Notes: [Rationale](https://lists.swift.org/pipermail/swift-evolution/Week-of-Mon-20160125/007797.html)
-* Pull Request: [apple/swift#1170](https://github.com/apple/swift/pull/1170)
+* Implementation: [apple/swift#1170](https://github.com/apple/swift/pull/1170)
 
 ## Introduction
 
@@ -112,7 +112,7 @@ from a string.
 
 The primary alternative is [type-safe
 selectors](https://lists.swift.org/pipermail/swift-evolution/2015-December/000233.html),
-which would introduce a new "selector" calling convetion to capture
+which would introduce a new "selector" calling convention to capture
 the type of an `@objc` method, including its selector. One major
 benefit of type-safe selectors is that they can carry type
 information, improving type safety. From that discussion, referencing
